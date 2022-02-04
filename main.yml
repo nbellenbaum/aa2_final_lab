@@ -1,3 +1,42 @@
 ---
+#
+# Provision the containers in Openstack
+# 
 - import_playbook: provision.yml
+#
+# Configure for DNS and register to satellite
+#
 - import_playbook: configure.yml
+
+# 
+# Start configuration of database, app servers and proxy
+#
+- name: Play to setup PostgreSQL DB
+  hosts: database_servers
+  roles:
+    - role: firewall
+      vars:
+        firewalls_tcp_port:
+          - 5432
+
+    - role: geerlingguy.postgresql
+
+#- name: Play to setup Flask app servers
+#  hosts: app_servers
+#  roles:
+#    - role: firewall
+#      vars:
+#        firewall_services:
+#          - http
+#
+#    - role: flask
+
+- name: Play to setup HA Proxy
+  hosts: loadbalancers
+  roles:
+    - role: firewall
+      vars:
+        firewall_services:
+          - http
+
+    - role: haproxy

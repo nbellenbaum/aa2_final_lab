@@ -1,17 +1,14 @@
-- name: Play to update DNS and register with satellite
-  hosts: osp_instances
-  become: yes
+- name: Deletes the instances in b262-dev-network
+  hosts: localhost
+  connection: local
   gather_facts: false
 
-  vars:
-    satellite_org: prod
-
   tasks:
-    - name: Delete servers in the OSP instance
-      hosts: localhost
-      tasks:
-        - name: remove an instance
-          openstack.cloud.server:
-            name: osp_instances
-            state: absent
+    - name: Include Instance variables
+      include_vars: instances_vars.yml
+    
+    - name: Remove the instance
+      openstack.cloud.server:
+        name: b262-dev-network
+        state: absent
 
