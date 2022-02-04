@@ -1,0 +1,86 @@
+#
+# Play 1 - Create in-memory inventory
+#
+- name: In-memory inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    guid: "{{ lookup('ENV','GUID') }}"
+    home: "{{ lookup('ENV','HOME') }}"
+    internal_domain: "example.com"
+  
+  tasks:
+    - name: Wait for ssh to be available
+      wait_for_connection: 
+
+    - name: Collection instance info
+      os_server_info:
+        cloud: "{{ guid }}-project"
+      register: instances
+
+    - name: Build In-Memory inventory
+      add_host:
+        host: "{{ instance.name }}.{{ internal_domain }}"
+        group: "{{ instance.metadata.AnsibleGroup }}"
+        ansible_host: "{{ instance.private_v4 }}"
+        ssh_private_key_file: "{{ home }}/.ssh/{{ guid }}key.pem"
+      when: instance.metadata.AnsibleGroup == "osp_instances"
+      loop: "{{ instances.openstack_servers }}"
+      loop_control:
+        loop_var: instance
+
+#
+# Play 2 - Update DNS and register with satellite 
+#
+- name: Play to update DNS and register with satellite
+  hosts: osp_instances
+  become: yes
+  gather_facts: true
+
+  vars:
+    satellite_activationkey: gpte-labs-rhel8
+    satellite_org: prod
+   
+  tasks:
+    - name: Wait for host to be reachable
+      wait_for_connection:
+
+    - name: Gather network facts
+      setup:
+        gather_subset:
+          - 'network'
+      delegate_facts: true
+      delegate_to: localhost
+      connection: local
+
+
+    - name: DNS IP updated
+      lineinfile:
+        state: present
+        path: /etc/sysconfig/network-scripts/ifcfg-eth0
+        line: "{{ item }}"
+      loop:
+        - PEERDNS=no
+        - DNS1={{ hostvars.localhost.ansible_default_ipv4.address }}
+      register: network_update
+
+    - name: restart network manager
+      service:
+        name: NetworkManager
+        state: restarted
+      when: network_update.changed | bool
+
+    - name: install katello-ca-consumer package
+      yum:
+        name: http://satellite.example.com/pub/katello-ca-consumer-latest.noarch.rpm
+        state: present
+        disable_gpg_check: true
+
+    - name: register system and attach subs
+      redhat_subscription:
+        state: present
+        activationkey: "{{ satellite_activationkey }}"
+        org_id: "{{ satellite_org }}"
+        auto_attach: true
