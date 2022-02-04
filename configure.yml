@@ -30,6 +30,10 @@
       loop: "{{ instances.openstack_servers }}"
       loop_control:
         loop_var: instance
+    
+    - name: Pause for 60 seconds so new local hosts resolve via DNS
+      pause:
+        minutes: 1
 
 #
 # Play 2 - Update DNS and register with satellite 

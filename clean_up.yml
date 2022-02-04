@@ -1,0 +1,17 @@
+- name: Play to update DNS and register with satellite
+  hosts: osp_instances
+  become: yes
+  gather_facts: false
+
+  vars:
+    satellite_org: prod
+
+  tasks:
+    - name: Delete servers in the OSP instance
+      hosts: localhost
+      tasks:
+        - name: remove an instance
+          openstack.cloud.server:
+            name: osp_instances
+            state: absent
+
